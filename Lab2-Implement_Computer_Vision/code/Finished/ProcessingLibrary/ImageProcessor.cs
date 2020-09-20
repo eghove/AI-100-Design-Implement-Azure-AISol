@@ -2,7 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.ProjectOxford.Vision;
+using Microsoft.ProjectOxford.Vision; //where many Azure Cognitive services got their start.
 using ServiceHelpers;
 
 // Below each "Step" there is code that should be entered
