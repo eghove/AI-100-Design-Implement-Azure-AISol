@@ -63,9 +63,10 @@ namespace PictureBot
                     await context.SendActivityAsync("Sorry, it looks like something went wrong.");
                 };
 
-                // The Memory Storage used here is for local bot debugging only. When the bot
-                // is restarted, everything stored in memory will be gone.
-                IStorage dataStore = new MemoryStorage();
+                // Changing this to a blob to persist data
+                var blobConnectionString = Configuration.GetSection("BlobStorageConnectionString")?.Value;
+                var blobContainer = Configuration.GetSection("BlobStorageContainer")?.Value;
+                IStorage dataStore = new Microsoft.Bot.Builder.Azure.AzureBlobStorage(blobConnectionString, blobContainer);
 
                 // For production bots use the Azure Blob or
                 // Azure CosmosDB storage providers. For the Azure

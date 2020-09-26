@@ -46,6 +46,10 @@ namespace PictureBot.Bots
         {
             if (turnContext.Activity.Type is "message")
             {
+                var utterance = turnContext.Activity.Text;
+                var state = await _accessors.PictureState.GetAsync(turnContext, () => new PictureState());
+                state.UtteranceList.Add(utterance);
+                await _accessors.ConversationState.SaveChangesAsync(turnContext);
                 // Establish dialog context from the conversation state.
                 var dc = await _dialogs.CreateContextAsync(turnContext);
                 // Continue any current dialog.
