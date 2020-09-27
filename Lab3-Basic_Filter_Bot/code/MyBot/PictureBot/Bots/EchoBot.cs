@@ -25,6 +25,7 @@ namespace PictureBot.Bots
     {
         private readonly PictureBotAccessors _accessors;
         // Initialize LUIS Recognizer
+        private LuisRecognizer _recognizer { get; } = null;
 
         private readonly ILogger _logger;
         private DialogSet _dialogs;
@@ -70,7 +71,7 @@ namespace PictureBot.Bots
         /// <param name="accessors">A class containing <see cref="IStatePropertyAccessor{T}"/> used to manage state.</param>
         /// <param name="loggerFactory">A <see cref="ILoggerFactory"/> that is hooked to the Azure App Service provider.</param>
         /// <seealso cref="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging/?view=aspnetcore-2.1#windows-eventlog-provider"/>
-        public EchoBot(PictureBotAccessors accessors, ILoggerFactory loggerFactory /*, LuisRecognizer recognizer*/)
+        public EchoBot(PictureBotAccessors accessors, ILoggerFactory loggerFactory, LuisRecognizer recognizer)
         {
             if (loggerFactory == null)
             {
@@ -78,7 +79,9 @@ namespace PictureBot.Bots
             }
 
             // Add instance of LUIS Recognizer
+            _recognizer = recognizer ?? throw new ArgumentNullException(nameof(recognizer));
 
+            // Loggers and accessors
             _logger = loggerFactory.CreateLogger<EchoBot>();
             _logger.LogTrace("PictureBot turn start.");
             _accessors = accessors ?? throw new System.ArgumentNullException(nameof(accessors));
@@ -146,9 +149,13 @@ namespace PictureBot.Bots
         {
             // Check if we are currently processing a user's search
             var state = await _accessors.PictureState.GetAsync(stepContext.Context);
+            var test = stepContext.Context.Activity.Entities;
 
             // If Regex picks up on anything, store it
             var recognizedIntents = stepContext.Context.TurnState.Get<IRecognizedIntents>();
+            var utterance = stepContext.Context.Activity.Text;
+          
+
             // Based on the recognized intent, direct the conversation
             switch (recognizedIntents.TopIntent?.Name)
             {
@@ -169,7 +176,43 @@ namespace PictureBot.Bots
                     return await stepContext.EndDialogAsync();
                 default:
                     {
-                        await MainResponses.ReplyWithConfused(stepContext.Context);
+                        // Call LUIS recognizer
+                        var result = await _recognizer.RecognizeAsync(stepContext.Context, cancellationToken);
+                        // Get the top intent from the results
+                        var topIntent = result?.GetTopScoringIntent();
+                        // Based on the intent, switch the conversation, similar concept as with Regex above
+                        switch ((topIntent != null) ? topIntent.Value.intent : null)
+                        {
+                            case null:
+                                // Add app logic when there is no result.
+                                await MainResponses.ReplyWithConfused(stepContext.Context);
+                                break;
+                            case "None":
+                                await MainResponses.ReplyWithConfused(stepContext.Context);
+                                // with each statement, we're adding the LuisScore, purely to test, so we know whether LUIS was called or not
+                                await MainResponses.ReplyWithLuisScore(stepContext.Context, topIntent.Value.intent, topIntent.Value.score);
+                                break;
+                            case "Greeting":
+                                await MainResponses.ReplyWithGreeting(stepContext.Context);
+                                await MainResponses.ReplyWithHelp(stepContext.Context);
+                                await MainResponses.ReplyWithLuisScore(stepContext.Context, topIntent.Value.intent, topIntent.Value.score);
+                                break;
+                            case "OrderPic":
+                                await MainResponses.ReplyWithOrderConfirmation(stepContext.Context);
+                                await MainResponses.ReplyWithLuisScore(stepContext.Context, topIntent.Value.intent, topIntent.Value.score);
+                                break;
+                            case "SharePic":
+                                await MainResponses.ReplyWithShareConfirmation(stepContext.Context);
+                                await MainResponses.ReplyWithLuisScore(stepContext.Context, topIntent.Value.intent, topIntent.Value.score);
+                                break;
+                            case "SearchPic":
+                                await SearchResponses.ReplyWithSearchConfirmation(stepContext.Context, utterance);
+                                await MainResponses.ReplyWithLuisScore(stepContext.Context, topIntent.Value.intent, topIntent.Value.score);
+                                break;
+                            default:
+                                await MainResponses.ReplyWithConfused(stepContext.Context);
+                                break;
+                        }
                         return await stepContext.EndDialogAsync();
                     }
             }

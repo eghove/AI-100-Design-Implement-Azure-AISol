@@ -137,6 +137,27 @@ namespace PictureBot
                 return accessors;
             });
 
+            // Create and register a LUIS recognizer.
+            services.AddSingleton(sp =>
+            {
+                var luisAppId = Configuration.GetSection("luisAppId")?.Value;
+                var luisAppKey = Configuration.GetSection("luisAppKey")?.Value;
+                var luisEndPoint = Configuration.GetSection("luisEndPoint")?.Value;
+
+                // Get LUIS information
+                var luisApp = new LuisApplication(luisAppId, luisAppKey, luisEndPoint);
+
+                // Specify LUIS options. These may vary for your bot.
+                var luisPredictionOptions = new LuisPredictionOptions
+                {
+                    IncludeAllIntents = true,
+                };
+
+                // Create the recognizer
+                var recognizer = new LuisRecognizer(luisApp, luisPredictionOptions, true, null);
+                return recognizer;
+            });
+
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
