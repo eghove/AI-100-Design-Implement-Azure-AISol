@@ -23,6 +23,9 @@ using Microsoft.PictureBot;
 using PictureBot.Bots;
 using Microsoft.Bot.Builder.AI.Luis;
 using Microsoft.Bot.Builder.Dialogs;
+using Microsoft.Azure.CognitiveServices.Language.TextAnalytics;
+using Microsoft.Azure.CognitiveServices.Language.TextAnalytics.Models;
+using Microsoft.Azure.CognitiveServices.Language.LUIS.Runtime;
 
 namespace PictureBot
 {
@@ -158,6 +161,19 @@ namespace PictureBot
                 return recognizer;
             });
 
+            services.AddSingleton(sp =>
+            {
+                string cogsBaseUrl = Configuration.GetSection("cogsBaseUrl")?.Value;
+                string cogsKey = Configuration.GetSection("cogsKey")?.Value;
+
+                var credentials = new ApiKeyServiceClientCredentials(cogsKey);
+                TextAnalyticsClient client = new TextAnalyticsClient(credentials)
+                {
+                    Endpoint = cogsBaseUrl
+                };
+
+                return client;
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

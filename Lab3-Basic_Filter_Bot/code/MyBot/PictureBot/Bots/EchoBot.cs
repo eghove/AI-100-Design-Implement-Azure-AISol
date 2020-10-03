@@ -19,6 +19,9 @@ using System;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Microsoft.PictureBot;
+using Microsoft.Azure.CognitiveServices.Language.TextAnalytics;
+using Microsoft.Azure.CognitiveServices.Language.TextAnalytics.Models;
+
 namespace PictureBot.Bots
 {
     public class EchoBot : ActivityHandler
@@ -29,6 +32,8 @@ namespace PictureBot.Bots
 
         private readonly ILogger _logger;
         private DialogSet _dialogs;
+
+        private TextAnalyticsClient _textAnalyticsClient;
 
         /// <summary>
         /// Every conversation turn for our PictureBot will call this method.
@@ -51,6 +56,19 @@ namespace PictureBot.Bots
                 var state = await _accessors.PictureState.GetAsync(turnContext, () => new PictureState());
                 state.UtteranceList.Add(utterance);
                 await _accessors.ConversationState.SaveChangesAsync(turnContext);
+                //Check the language
+                var result = _textAnalyticsClient.DetectLanguage(turnContext.Activity.Text, "us");
+
+                switch (result.DetectedLanguages[0].Name)
+                {
+                    case "English":
+                        break;
+                    default:
+                        //throw error
+                        await turnContext.SendActivityAsync($"I'm sorry, I can only understand English. [{result.DetectedLanguages[0].Name}]");
+                        return;
+                }
+
                 // Establish dialog context from the conversation state.
                 var dc = await _dialogs.CreateContextAsync(turnContext);
                 // Continue any current dialog.
@@ -71,7 +89,7 @@ namespace PictureBot.Bots
         /// <param name="accessors">A class containing <see cref="IStatePropertyAccessor{T}"/> used to manage state.</param>
         /// <param name="loggerFactory">A <see cref="ILoggerFactory"/> that is hooked to the Azure App Service provider.</param>
         /// <seealso cref="https://docs.microsoft.com/en-us/aspnet/core/fundamentals/logging/?view=aspnetcore-2.1#windows-eventlog-provider"/>
-        public EchoBot(PictureBotAccessors accessors, ILoggerFactory loggerFactory, LuisRecognizer recognizer)
+        public EchoBot(PictureBotAccessors accessors, ILoggerFactory loggerFactory, LuisRecognizer recognizer, TextAnalyticsClient analyticsClient)
         {
             if (loggerFactory == null)
             {
@@ -88,6 +106,9 @@ namespace PictureBot.Bots
 
             // The DialogSet needs a DialogState accessor, it will call it when it has a turn context.
             _dialogs = new DialogSet(_accessors.DialogStateAccessor);
+
+            // initialize the textAnalytics client
+            _textAnalyticsClient = analyticsClient; 
 
             // This array defines how the Waterfall will execute.
             // We can define the different dialogs and their steps here
@@ -110,6 +131,7 @@ namespace PictureBot.Bots
             _dialogs.Add(new WaterfallDialog("searchDialog", search_waterfallsteps));
             // The following line allows us to use a prompt within the dialogs
             _dialogs.Add(new TextPrompt("searchPrompt"));
+            
         }
         // Add MainDialog-related tasks
         private async Task<DialogTurnResult> GreetingAsync(WaterfallStepContext stepContext, CancellationToken cancellationToken)
